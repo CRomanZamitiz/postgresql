@@ -1,0 +1,69 @@
+Se asume que el servidor original o master se encuentra en:
+/opt/PostgreSQL/9.4 y que se hace una copia de éste para que sea el esclavo o standby en:
+/opt/PostgreSQL/9.4v2
+
+Como root crear el directorio /pgdata/arch
+mkdir -p /pgdata/arch
+y dar permisos de propietario a postgres
+chown -R postgres:postgres /pgdata/arch
+
+Todo lo que sigue lo ejecutan como usuario postgres
+
+1. Respaldar el archivo postgresql.conf
+cp /opt/PostgreSQL/9.4/data/postgresql.conf /opt/PostgreSQL/9.4/data/postgresql.conf.respaldo
+
+2. Editar el archivo /opt/PostgreSQL/9.4/data/postgresql.conf
+
+wal_level = hot_standby
+archive_mode = on
+archive_command = 'cp %p /pgdata/arch/%f'
+max_wal_senders = 3
+wal_keep_segments = 20
+
+# Guardar y cerrar el archivo
+
+3. Modificar /opt/PostgreSQL/9.4/data/pg_hba.conf, para agregar la siguiente linea:
+
+host replication postgres 127.0.0.1/32 trust
+
+4. Reiniciamos servidor master
+
+service postgresql-9.4 restart o
+pg_ctl restart
+
+5. Se borra el directorio data del esclavo
+
+rm -rf /opt/PostgreSQL/9.4v2/data
+
+6. Se hace una copia del cluster master al esclavo
+ 
+pg_basebackup -h localhost -U postgres -D /opt/PostgreSQL/9.4v2/data
+
+7. Se modifica el postgresql.conf del esclavo porque master y esclavo correrán en el mismo host y el esclavo debe estar en un puerto diferente al 5432
+
+port = 5433
+hot_standby = on
+
+8. Se borra el postmaster.pid en el esclavo (si existiera)
+
+rm /opt/PostgreSQL/9.4v2/data/postmaster.pid
+
+9. Se crea el /opt/PostgreSQL/9.4v2/data/recovery.conf
+
+standby_mode = 'on'
+primary_conninfo = 'host=localhost port=5432'
+trigger_file = '/tmp/trigger_hot_standby_failover'
+
+10. Levantar el esclavo
+
+pg_ctl -D /opt/PostgreSQL/9.4v2/data start
+
+11. Conectarse al maestro
+
+psql -U hoplastore hoplastore
+
+12. Conectarse al esclavo
+
+psql -p 5433 -U hoplastore hoplastore
+
+13. Verificar el hot streaming replication: creando/eliminando una tabla, una tupla y observar los cambios "en caliente" en el esclavo.
