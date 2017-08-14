@@ -1,0 +1,15 @@
+# .bash_profile
+
+# Get the aliases and functions
+if [ -f ~/.bashrc ]; then
+        . ~/.bashrc
+fi
+
+# User specific environment and startup programs
+
+PATH=$PATH:/opt/PostgreSQL/9.4/bin
+export PATH
+
+PGDATA=/opt/PostgreSQL/9.4/data
+export PGDATA
+
